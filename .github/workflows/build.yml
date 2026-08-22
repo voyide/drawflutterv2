@@ -1,0 +1,52 @@
+name: Android CI Build
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java (v5 fixes deprecation warning)
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          architecture: x64
+
+      - name: Generate Missing Android Build Files
+        run: |
+          # 1. Back up our custom dart code and pubspec
+          mkdir -p backup_code
+          cp -r lib pubspec.yaml backup_code/
+          
+          # 2. Tell flutter to generate the 'android' compilation folder
+          flutter create --platforms android --project-name brutal_draw --org com.brutaldraw .
+          
+          # 3. Restore our custom Dart code, just in case Flutter overwrote main.dart
+          cp -rf backup_code/* ./
+          rm -rf backup_code
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK (Release)
+        run: flutter build apk --release
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BrutalDraw-Android-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
